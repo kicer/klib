@@ -9,6 +9,13 @@
 #include "kconf.h"
 #undef _KLIB_H_INSIDE_
 
+#define MAX_LENGTH_OF_LINE	512
+#define SEP_CHAR		'='
+#define COMMENT_CHAR	'#'
+#define is_comment(c) ((c) == COMMENT_CHAR)
+#define is_sep(c) ((c) == SEP_CHAR)
+#define is_quote(c) (((c) == '"') || ((c) == '\''))
+
 typedef enum {
 	FIND_WORD_START,
 	FIND_WORD_END,
@@ -16,25 +23,18 @@ typedef enum {
 } CONFIG_STATE;
 
 typedef struct {
-	int key_start;
-	int key_len;
+	int word_start;
+	int word_len;
 	int quote_flag;
 	const char *pbuf;
 } WORD_INFO;
-
-#define SEP_CHAR		'='
-#define COMMENT_CHAR	'#'
-#define is_comment(c) ((c) == COMMENT_CHAR)
-#define is_sep(c) ((c) == SEP_CHAR)
-#define is_quote(c) (((c) == '"') || ((c) == '\''))
-
 
 static WORD_INFO chk_word(const char *buf) {
 	const char * pbuf = buf;
 	CONFIG_STATE state = FIND_WORD_START;
 
-	int key_start = 0;
-	int key_len = -1;
+	int word_start = 0;
+	int word_len = -1;
 	int quote_flag = -1;
 	int space_flag = -1;
 
@@ -49,14 +49,14 @@ static WORD_INFO chk_word(const char *buf) {
 					quote_flag = *pbuf;
 					char *ptmp = strchr(pbuf+1, quote_flag);
 					if(ptmp != NULL) {
-						key_len = ptmp - pbuf - 1;
-						if(key_len > 0) {
-							key_start = pbuf - buf + 1;
+						word_len = ptmp - pbuf - 1;
+						if(word_len > 0) {
+							word_start = pbuf - buf + 1;
 							state = PARSE_WORD_END;
 							pbuf = ptmp;
 						} else {
 							/* key is "" */
-							key_len = -1;
+							word_len = -1;
 							state = PARSE_WORD_END;
 						}
 					} else {
@@ -64,7 +64,7 @@ static WORD_INFO chk_word(const char *buf) {
 						state = PARSE_WORD_END;
 					}
 				} else {
-					key_start = pbuf - buf;
+					word_start = pbuf - buf;
 					state = FIND_WORD_END;
 				}
 				break;
@@ -72,13 +72,13 @@ static WORD_INFO chk_word(const char *buf) {
 			case FIND_WORD_END:
 				if(is_sep(*pbuf) || is_comment(*pbuf)) {
 					if(space_flag == -1) {
-						key_len = pbuf - buf - key_start;
+						word_len = pbuf - buf - word_start;
 					} else {
-						key_len = space_flag - key_start;
+						word_len = space_flag - word_start;
 					}
-					if(key_len <= 0) {
+					if(word_len <= 0) {
 						/* key is "" */
-						key_len = -1;
+						word_len = -1;
 					}
 					state = PARSE_WORD_END;
 				} else if(isspace(*pbuf)) {
@@ -96,8 +96,8 @@ static WORD_INFO chk_word(const char *buf) {
 	}
 
 	WORD_INFO t;
-	t.key_start = key_start;
-	t.key_len = key_len;
+	t.word_start = word_start;
+	t.word_len = word_len;
 	t.quote_flag = quote_flag;
 	t.pbuf = pbuf;
 
@@ -105,11 +105,13 @@ static WORD_INFO chk_word(const char *buf) {
 }
 
 static const char *parse_key(const char *buf, const char *key) {
+	if(buf == NULL) return NULL;
+
 	WORD_INFO t = chk_word(buf);
 
-	if(t.key_len > 0) {
-		if(t.key_len == strlen(key)) {
-			if(strncmp(key, buf+t.key_start, t.key_len) == 0)
+	if(t.word_len > 0) {
+		if(t.word_len == strlen(key)) {
+			if(strncmp(key, buf+t.word_start, t.word_len) == 0)
 				return t.pbuf;
 		}
 	}
@@ -117,21 +119,24 @@ static const char *parse_key(const char *buf, const char *key) {
 	return NULL;
 }
 
-static int parse_value(const char *buf, char **val) {
+static const char *parse_value(const char *buf, char **val) {
+	if(buf == NULL) return NULL;
+
 	WORD_INFO t = chk_word(buf);
 
-	if(t.key_len > 0) {
-		*val = malloc(t.key_len+1);
-		*((*val)+t.key_len) = 0;
-		memcpy(*val, buf+t.key_start, t.key_len);
+	if(t.word_len > 0) {
+		*val = malloc(t.word_len+1);
+		*((*val)+t.word_len) = 0;
+		memcpy(*val, buf+t.word_start, t.word_len);
+		return t.pbuf;
 	}
 
-	return 0;
+	return NULL;
 }
 
 char* k_get_string(const char *key, const char *file) {
 	FILE *fp = NULL;
-	char buf[512]; /* max length of line */
+	char buf[MAX_LENGTH_OF_LINE]; /* max length of line */
 	char *pval = NULL;
 
 	fp = fopen(file, "r");
@@ -154,6 +159,47 @@ char* k_get_string(const char *key, const char *file) {
 	fclose(fp);
 
 	return pval;
+}
+
+int k_foreach_config(const char *file, int (*cb)(const char *key, const char *val, void *ptr), void *ptr) {
+	FILE *fp = NULL;
+	char buf[MAX_LENGTH_OF_LINE]; /* max length of line */
+	char *pval = NULL;
+	char *pkey = NULL;
+	int ret = -1;
+
+	fp = fopen(file, "r");
+	if(fp == NULL) {
+		fprintf(stderr, "Unable to open '%s' to parse\n", file);
+		return -1;
+	}
+
+	while(fgets(buf, sizeof(buf), fp) != NULL) {
+		const char *pbuf = parse_value(buf, &pkey);
+		if(pkey != NULL) {
+			const char *pstart = strchr(pbuf, SEP_CHAR);
+			if(pstart != NULL) {
+				parse_value(pstart+1, &pval);
+				if(pval != NULL) {
+					ret = (*cb)(pkey, pval, ptr);
+				}
+			}
+		}
+
+		if(pkey != NULL) {
+			free(pkey);
+			pkey = NULL;
+		}
+		if(pval != NULL) {
+			free(pval);
+			pval = NULL;
+		}
+
+		if(ret != 0) break;
+	}
+
+	fclose(fp);
+	return ret;
 }
 
 int k_get_int(const char *key, const char *file) {
@@ -182,6 +228,10 @@ int k_set_int(const char *key, const char *file, int val) {
 }
 
 #if 1
+int parse_config(const char *key, const char *val, void *ptr) {
+	printf("(%s,%s)\n", key, val);
+	return 0;
+}
 int main(int argc, char **argv) {
 	if(argc != 2) {
 		fprintf(stderr, "Usage: %s <config-file>\n", argv[0]);
@@ -189,6 +239,8 @@ int main(int argc, char **argv) {
 	}
 
 	printf("Value of <%s> is: %d\n", "ONE   ONE", k_get_int("ONE   ONE", argv[1]));
+
+	k_foreach_config(argv[1], parse_config, NULL);
 
 	return 0;
 }
