@@ -15,6 +15,7 @@
 #define is_comment(c) ((c) == COMMENT_CHAR)
 #define is_sep(c) ((c) == SEP_CHAR)
 #define is_quote(c) (((c) == '"') || ((c) == '\''))
+#define is_CRLF(c) (((c) == '\x0d') || ((c) == '\x0a'))
 
 typedef enum {
 	FIND_WORD_START,
@@ -70,7 +71,7 @@ static WORD_INFO chk_word(const char *buf) {
 				break;
 
 			case FIND_WORD_END:
-				if(is_sep(*pbuf) || is_comment(*pbuf)) {
+				if(is_sep(*pbuf) || is_comment(*pbuf) || is_CRLF(*pbuf)) {
 					if(space_flag == -1) {
 						word_len = pbuf - buf - word_start;
 					} else {
