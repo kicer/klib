@@ -176,27 +176,21 @@ int k_foreach_config(const char *file, int (*cb)(const char *key, const char *va
 	}
 
 	while(fgets(buf, sizeof(buf), fp) != NULL) {
-		const char *pbuf = parse_value(buf, &pkey);
-		if(pkey != NULL) {
-			const char *pstart = strchr(pbuf, SEP_CHAR);
+		WORD_INFO t1 = chk_word(buf);
+		if(t1.word_len > 0) {
+			char *pstart = strchr(t1.pbuf, SEP_CHAR);
 			if(pstart != NULL) {
-				parse_value(pstart+1, &pval);
-				if(pval != NULL) {
+				WORD_INFO t2 = chk_word(pstart+1);
+				if(t2.word_len > 0) {
+					pkey = buf + t1.word_start;
+					*(pkey+t1.word_len) = 0;
+					pval = pstart + 1 + t2.word_start;
+					*(pval+t2.word_len) = 0;
 					ret = (*cb)(pkey, pval, ptr);
+					if(ret != 0) break;
 				}
 			}
 		}
-
-		if(pkey != NULL) {
-			free(pkey);
-			pkey = NULL;
-		}
-		if(pval != NULL) {
-			free(pval);
-			pval = NULL;
-		}
-
-		if(ret != 0) break;
 	}
 
 	fclose(fp);
