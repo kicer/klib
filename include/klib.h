@@ -3,9 +3,9 @@
 
 #define _KLIB_H_INSIDE_
 
-#include <klib/kmacros.h>
-#include <klib/ktypes.h>
-#include <klib/kconf.h>
+#include <sys/kmacros.h>
+#include <sys/ktypes.h>
+#include <sys/kconf.h>
 
 #undef _KLIB_H_INSIDE_
 
