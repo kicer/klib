@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 
 #define _KLIB_H_INSIDE_
 #include "kmacros.h"
@@ -197,13 +198,16 @@ int k_foreach_config(const char *file, int (*cb)(const char *key, const char *va
 	return ret;
 }
 
-int k_get_int(const char *key, const char *file) {
-	int val = 0;
+long int k_get_long(const char *key, const char *file, long int def) {
+	long int val = def;
 
 	char *p = k_get_string(key, file);
 	if(p != NULL) {
 		if(*p) {
-			val = atoi(p);
+			char *endptr = NULL;
+			errno = 0;
+			val = strtol(p, &endptr, 0);
+			if((endptr == p) || (errno != 0)) val = def;
 		}
 		free(p);
 	}
@@ -233,7 +237,7 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-	printf("Value of <%s> is: %d\n", "ONE   ONE", k_get_int("ONE   ONE", argv[1]));
+	printf("Value of <%s> is: %ld\n", "ONE   ONE", k_get_long("ONE   ONE", argv[1], -1));
 
 	k_foreach_config(argv[1], parse_config, NULL);
 
