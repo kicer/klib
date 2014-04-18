@@ -45,24 +45,18 @@ static WORD_INFO chk_word(const char *buf) {
 			case FIND_WORD_START:
 				if(isspace(*pbuf)) {
 				} else if(is_comment(*pbuf)) {
-					/* comment line */
+					/* invalid, comment line */
 					state = PARSE_WORD_END;
 				} else if(is_quote(*pbuf)) {
 					quote_flag = *pbuf;
 					char *ptmp = strchr(pbuf+1, quote_flag);
 					if(ptmp != NULL) {
 						word_len = ptmp - pbuf - 1;
-						if(word_len > 0) {
-							word_start = pbuf - buf + 1;
-							state = PARSE_WORD_END;
-							pbuf = ptmp;
-						} else {
-							/* key is "" */
-							word_len = -1;
-							state = PARSE_WORD_END;
-						}
+						word_start = pbuf - buf + 1;
+						state = PARSE_WORD_END;
+						pbuf = ptmp;
 					} else {
-						/* single-quote key */
+						/* invalid, only single-quote key */
 						state = PARSE_WORD_END;
 					}
 				} else {
@@ -78,10 +72,6 @@ static WORD_INFO chk_word(const char *buf) {
 					} else {
 						word_len = space_flag - word_start;
 					}
-					if(word_len <= 0) {
-						/* key is "" */
-						word_len = -1;
-					}
 					state = PARSE_WORD_END;
 				} else if(isspace(*pbuf)) {
 					if(space_flag == -1)
@@ -95,6 +85,14 @@ static WORD_INFO chk_word(const char *buf) {
 		}
 		if(state == PARSE_WORD_END) break;
 		pbuf++;
+	}
+
+	if(state == FIND_WORD_END) { /* no CR/LF in last line */
+		if(space_flag == -1) {
+			word_len = pbuf - buf - word_start;
+		} else {
+			word_len = space_flag - word_start;
+		}
 	}
 
 	WORD_INFO t;
