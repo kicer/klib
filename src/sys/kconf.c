@@ -139,7 +139,7 @@ static const char *parse_value(const char *buf, char **val) {
 	return NULL;
 }
 
-char* k_conf_get_string(const char *key, const char *file) {
+char* k_conf_get_string(const char *file, const char *key) {
 	FILE *fp = NULL;
 	char buf[MAX_LENGTH_OF_LINE]; /* max length of line */
 	char *pval = NULL;
@@ -201,10 +201,10 @@ int k_conf_foreach(const char *file, int (*cb)(const char *key, const char *val,
 	return ret;
 }
 
-long int k_conf_get_long(const char *key, const char *file, long int def) {
+long int k_conf_get_long(const char *file, const char *key, long int def) {
 	long int val = def;
 
-	char *p = k_conf_get_string(key, file);
+	char *p = k_conf_get_string(file, key);
 	if(p != NULL) {
 		if(*p) {
 			char *endptr = NULL;
@@ -244,8 +244,8 @@ static char chk_word_quote(const char *word) {
 	}
 
 	if(special_symbol_flag == 1) {
-		if(quote1_flag == 0) return QUOTE1_CHAR;
-		else if(quote2_flag == 0) return QUOTE2_CHAR;
+		if(quote2_flag == 0) return QUOTE2_CHAR;
+		else if(quote1_flag == 0) return QUOTE1_CHAR;
 		else return '\0';
 	}
 
@@ -277,7 +277,7 @@ static int relloc_line(FILE *f, char *str, int str_len, int line_len) {
 	return -1;
 }
 
-int k_conf_set_string(const char *key, const char *file, const char *val) {
+int k_conf_set_string(const char *file, const char *key, const char *val) {
 	char key_quote, val_quote;
 	char buf[MAX_LENGTH_OF_LINE];
 	FILE *f = NULL;
@@ -349,9 +349,9 @@ int k_conf_set_string(const char *key, const char *file, const char *val) {
 	return ret;
 }
 
-int k_conf_set_long(const char *key, const char *file, long int val) {
+int k_conf_set_long(const char *file, const char *key, long int val) {
 	char buff[16];
 	snprintf(buff, sizeof(buff), "%ld", val);
 
-	return k_conf_set_string(key, file, buff);
+	return k_conf_set_string(file, key, buff);
 }
