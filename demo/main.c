@@ -15,9 +15,17 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-	printf("Value of <%s> is: %ld\n", "ONE   ONE", k_get_long("ONE   ONE", argv[1], -1));
+	printf("Value of <%s> is: %ld\n", "ONE   ONE", k_conf_get_long("ONE   ONE", argv[1], -1));
+	k_conf_set_long("ONE   ONE", argv[1], 1024);
+	k_conf_set_string("#", argv[1], "comment");
+	k_conf_set_string("'", argv[1], "quote1");
+	k_conf_set_string("=", argv[1], "sep");
+	k_conf_set_string("\"", argv[1], "quote2");
+	k_conf_set_string(" ", argv[1], "space");
+	k_conf_set_string("	", argv[1], "tab");
+	printf("Value of <%s> is: %ld\n", "ONE   ONE", k_conf_get_long("ONE   ONE", argv[1], -1));
 
-	k_foreach_config(argv[1], parse_config, NULL);
+	k_conf_foreach(argv[1], parse_config, NULL);
 
 	return 0;
 }
